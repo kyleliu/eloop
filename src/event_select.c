@@ -15,6 +15,9 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#elif defined(__APPLE__) || defined(__FreeBSD__)
+#include <sys/event.h>
+#include <sys/time.h>
 #elif defined(WIN32) || defined(_WIN32) 
 #include <WinSock2.h>
 #include <windows.h>

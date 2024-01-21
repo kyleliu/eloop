@@ -11,12 +11,15 @@
 #include <string.h>
 #include <stdlib.h>
 
-#if defined(__linux) || defined(__linux__) 
+#if defined(__linux) || defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
 #include <sys/select.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <netinet/tcp.h>
+#include <errno.h>
 #elif defined(WIN32) || defined(_WIN32) 
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -72,7 +75,7 @@ net_fd_close(int *fd)
 {
     int ret = 0;
 
-#if defined(__linux) || defined(__linux__) 
+#if defined(__linux) || defined(__linux__)  || defined(__APPLE__) || defined(__FreeBSD__)
     close(*fd);
 #elif defined(WIN32) || defined(_WIN32)
     closesocket(*fd);      
@@ -85,7 +88,7 @@ net_fd_close(int *fd)
 int
 net_fd_shutdown_read(int fd)
 {
-#if defined(__linux) || defined(__linux__) 
+#if defined(__linux) || defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
     return shutdown(fd, SHUT_RD);
 #elif defined(WIN32) || defined(_WIN32)
     return shutdown(fd, SD_RECEIVE);
@@ -95,7 +98,7 @@ net_fd_shutdown_read(int fd)
 int
 net_fd_shutdown_write(int fd)
 {
-#if defined(__linux) || defined(__linux__) 
+#if defined(__linux) || defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
     return shutdown(fd, SHUT_WR);
 #elif defined(WIN32) || defined(_WIN32)
     return shutdown(fd, SD_SEND);
@@ -107,7 +110,7 @@ net_fd_set_block_direct(int fd, char is_block, int *error)
 {
     int ret = 0;
 
-#if defined(__linux) || defined(__linux__) 
+#if defined(__linux) || defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
     int flags = fcntl(fd, F_GETFL, 0);
     if (is_block)   flags = flags & ~O_NONBLOCK;
     else            flags = flags | O_NONBLOCK;
@@ -146,8 +149,11 @@ net_fd_read(int fd, char *buffer, size_t length, int *error)
 
     *error = 0;
 
-#if defined(__linux) || defined(__linux__)
+#if defined(__linux) || defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
     ret = recv(fd, buffer, length, 0);
+    if (ret == -1) {
+        *error = errno;
+    }
     /* TODO: process no data */
 #else
     ret = recv(fd, buffer, (int) length, 0);
@@ -164,7 +170,7 @@ net_fd_read(int fd, char *buffer, size_t length, int *error)
 int 
 net_fd_write(int fd, char *buffer, size_t length)
 {
-#if defined(__linux) || defined(__linux__)
+#if defined(__linux) || defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
     return send(fd, buffer, length, 0);
 #else
     return send(fd, buffer, (int) length, 0);
@@ -270,7 +276,7 @@ LOOP:
             goto LOOP;
         }
 
-#if defined(__linux) || defined(__linux__)
+#if defined(__linux) || defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
         inet_ntop(AF_INET, &addr.sin_addr, ip, ip_length);
 #elif defined(WIN32) || defined(_WIN32)
         char *peer_ip = inet_ntoa(addr.sin_addr);
@@ -279,8 +285,8 @@ LOOP:
 
         *port = addr.sin_port;
     } else {
-#if defined(__linux) || defined(__linux__)
-        snprintf(err, err_length, "client_fd=%d");
+#if defined(__linux) || defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
+        snprintf(err, err_length, "client_fd=%d, error=%d", client_fd, error);
 #elif defined(WIN32) || defined(_WIN32)
         snprintf(err, err_length, "client_fd=%d, error=%d", client_fd, error);
 #endif
@@ -293,7 +299,7 @@ int net_get_last_error()
 {
     int ret = 0;
 
-#if defined(__linux) || defined(__linux__)
+#if defined(__linux) || defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
     if (errno == EINTR || errno == EAGAIN)
         ret = EAGAIN;
 #elif defined(WIN32) || defined(_WIN32)
