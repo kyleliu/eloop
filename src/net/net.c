@@ -23,7 +23,6 @@
 #elif defined(WIN32) || defined(_WIN32) 
 #include <winsock2.h>
 #include <ws2tcpip.h>
-/* #include <iphlpapi.h> */
 #endif
 
 #include <stdio.h>
@@ -214,44 +213,35 @@ net_tcp_server(const char *addr, unsigned short port, int backlog, char *err, si
     int ret = 0, error = 0;
 
     int fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd == -1) {
+    if (fd == -1) {        
         memset(err, 0x00, err_length);
-
-        snprintf(err, err_length, "socket fail ");
-
-#if defined(WIN32) || defined(_WIN32)
-        /* some mingw cann't include <stdio.h> */
-        DWORD error_code = GetLastError();
-        char *error_code_p = &error_code;
-        size_t len = strlen(err);
-        err[len] = 0x30 + error_code_p[0];
-        err[len+1] = 0x30 + error_code_p[1];
-        err[len+2] = 0x30 + error_code_p[2];
-        err[len+3] = 0x30 + error_code_p[3];
-#endif
+        error = net_get_last_error();
+        snprintf(err, err_length, "socket fail, error=%d", error);
         return -1;
     }
 
     ret = net_fd_set_noblock(fd, &error);
     if (ret) {
-        snprintf(err, err_length, "error=%d", error);
+        snprintf(err, err_length, "set_noblock fail, error=%d", error);
         net_fd_close(&fd);
         goto EXIT;
     }
     net_tcp_set_reuse(fd);
 
-    socket_addr.sin_family = AF_INET;		  
-    socket_addr.sin_addr.s_addr = inet_addr(addr); 
-    socket_addr.sin_port = htons(port);  
+    socket_addr.sin_family = AF_INET;
+    socket_addr.sin_addr.s_addr = inet_addr(addr);
+    socket_addr.sin_port = htons(port);
 
     if (bind(fd, (struct sockaddr *)&socket_addr, sizeof(socket_addr)) == -1) {
-        snprintf(err, err_length, "bind fail");
+        error = net_get_last_error();
+        snprintf(err, err_length, "bind fail, error=%d", error);
         net_fd_close(&fd);
         goto EXIT;
     }
 
     if (listen(fd, backlog) == -1) {
-        snprintf(err, err_length, "listen fail");
+        error = net_get_last_error();
+        snprintf(err, err_length, "listen fail, error=%d", error);
         net_fd_close(&fd);
         goto EXIT;
     }
